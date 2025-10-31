@@ -1,5 +1,5 @@
 {
-  "name": "Jarvis Developer Platform",
+  "name": "Developer Platform Workspace",
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".."
@@ -12,7 +12,7 @@
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
   "remoteEnv": {
-    "JARVIS_ROOT": "/workspace/jarvis"
+    "TARGET_ROOT": "/workspace/target"
   },
   "postCreateCommand": "bash scripts/bootstrap.sh --devcontainer",
   "customizations": {

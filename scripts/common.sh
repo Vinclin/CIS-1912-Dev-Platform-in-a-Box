@@ -41,8 +41,8 @@ resolve_var() {
   read_dotenv_var "$key" "$default"
 }
 
-resolve_jarvis_root() {
-  resolve_var "JARVIS_ROOT" "${PROJECT_ROOT}/jarvis"
+resolve_target_root() {
+  resolve_var "TARGET_ROOT" "${PROJECT_ROOT}/target"
 }
 
 resolve_compose_file() {
@@ -50,5 +50,5 @@ resolve_compose_file() {
 }
 
 resolve_compose_project_name() {
-  resolve_var "COMPOSE_PROJECT_NAME" "jarvis"
+  resolve_var "COMPOSE_PROJECT_NAME" "devplatform"
 }

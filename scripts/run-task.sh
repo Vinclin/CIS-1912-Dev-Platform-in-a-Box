@@ -18,21 +18,21 @@ if ! command -v task >/dev/null 2>&1; then
   exit 127
 fi
 
-JARVIS_REQUIRED=1
+TARGET_REQUIRED=1
 case "${TARGET}" in
   doctor|bootstrap)
-    JARVIS_REQUIRED=0
+    TARGET_REQUIRED=0
     ;;
 esac
 
-if [ "${JARVIS_REQUIRED}" -eq 1 ]; then
-  JARVIS_ROOT="$(resolve_jarvis_root)"
-  if [ ! -d "${JARVIS_ROOT}" ]; then
+if [ "${TARGET_REQUIRED}" -eq 1 ]; then
+  TARGET_ROOT="$(resolve_target_root)"
+  if [ ! -d "${TARGET_ROOT}" ]; then
     if [ "${RUN_TASK_STRICT:-0}" -eq 1 ]; then
-      log ERROR "Jarvis repository expected at ${JARVIS_ROOT} but not found."
+      log ERROR "Target project directory expected at ${TARGET_ROOT} but not found."
       exit 1
     fi
-    log WARN "Skipping task '${TARGET}' because Jarvis repo is missing (expected at ${JARVIS_ROOT})."
+    log WARN "Skipping task '${TARGET}' because target project directory is missing (expected at ${TARGET_ROOT})."
     exit 0
   fi
 fi

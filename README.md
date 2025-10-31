@@ -1,14 +1,14 @@
 # Developer Platform in a Box
 
-This repository packages a reproducible developer platform for the Jarvis monorepo. It combines a devcontainer-based workspace, a shared task runner, automated quality gates, secrets scaffolding, and CI automation so every engineer can spin up the full stack with minimal effort.
+This repository packages a reproducible developer platform that you can point at any existing project. It combines a devcontainer-based workspace, a shared task runner, automated quality gates, secrets scaffolding, and CI automation so every engineer can spin up the full stack with minimal effort. Sample templates for the CIS 1912 Jarvis lab stack are included, but the tooling works with any codebase.
 
 ---
 
 ## 1. Feature Overview
 - **Containerised workstation** via `.devcontainer/` with uv, Node.js, Docker CLI, Postgres/Redis clients, and the Task CLI pre-installed.
 - **Unified task runner** (`Taskfile.yml`) that wraps dependency installs, linting, testing, security scans, Docker Compose lifecycle, and migration utilities.
-- **Bootstrap automation** (`scripts/bootstrap.sh`) that seeds environment files, installs tooling, and syncs templates into the Jarvis repo.
-- **Secrets management templates** under `templates/jarvis/` to standardise `.env` files (public + private) across services.
+- **Bootstrap automation** (`scripts/bootstrap.sh`) that seeds environment files, installs tooling, and syncs templates into your target project.
+- **Secrets management templates** under `templates/` to standardise `.env` files (public + private) across services (Jarvis-specific samples are provided by default).
 - **Quality gates** powered by pre-commit hooks and reusable shell wrappers (`scripts/*.sh`) so local workflows match CI.
 - **GitHub Actions pipeline** (`.github/workflows/ci.yml`) running pre-commit, lint/test/security tasks, and Compose configuration validation.
 
@@ -22,15 +22,18 @@ This repository packages a reproducible developer platform for the Jarvis monore
 - Optional (for native usage) installations of Python 3.11+, Node.js 20+, and the [Task CLI](https://taskfile.dev/#/installation)
 
 ### Option A – Devcontainer (recommended)
-1. Clone this repo alongside the Jarvis monorepo (or update `.env.template` with the correct `JARVIS_ROOT`).
+1. Clone this repo and the project you want to automate (or update `.env.template` with the correct `TARGET_ROOT`).
 2. Open the folder in VS Code or `devcontainer up`.
 3. The `postCreateCommand` runs `scripts/bootstrap.sh --devcontainer`, installing hooks, syncing templates, and prepping dependencies.
 4. Use `task doctor` inside the container to verify tool versions.
 
 ### Option B – Native shell
-1. Copy `.env.template` to `.env` and update `JARVIS_ROOT` to point at your Jarvis checkout.
-2. Run `bash scripts/bootstrap.sh` to install Task + pre-commit, seed Jarvis environment files, and queue dependency installs.
+1. Copy `.env.template` to `.env` and update `TARGET_ROOT` to point at the project you want to automate.
+2. Run `bash scripts/bootstrap.sh` to install Task + pre-commit, seed environment files, and queue dependency installs.
 3. Execute recurring workflows via `task <target>` or the helper scripts in `scripts/`.
+
+
+**Note:** The repo ships with sample templates for the Jarvis lab (`templates/jarvis/**`). Delete or replace them when targeting a different project.
 
 ---
 
@@ -45,13 +48,13 @@ This repository packages a reproducible developer platform for the Jarvis monore
 - `task healthcheck` – Validate Compose configuration and service health.
 - `task ci` – Aggregate lint, test, and security steps (mirrors the CI workflow).
 
-All task targets honour the `.env` or `.env.local` overrides. If the Jarvis repo is missing, wrapper scripts skip gracefully unless `RUN_TASK_STRICT=1` is set.
+All task targets honour the `.env` or `.env.local` overrides. If the target project directory is missing, wrapper scripts skip gracefully unless `RUN_TASK_STRICT=1` is set.
 
 ---
 
 ## 4. Secrets & Environment Management
-- Copy `.env.template` to `.env` to configure `JARVIS_ROOT`, Compose options, and relative service paths.
-- `templates/jarvis/**` mirrors the expected environment files in the Jarvis repo. During bootstrap these templates are copied into place **only if the target files do not exist**, so local overrides remain safe.
+- Copy `.env.template` to `.env` to configure `TARGET_ROOT`, Compose options, and relative service paths.
+- Files under `templates/` are copied into the target project (only when the destination file is missing). This repo ships with Jarvis-specific examples under `templates/jarvis/`; keep them, remove them, or replace them with templates that match your own repository structure.
 - Sensitive keys (Gemini, Brave Search) live in `backend/services/chat/docker.env.private`, which remains gitignored upstream. The template provides placeholder values and guidance.
 - Use `.env.local` (from `.env.local.template`) for machine-specific overrides that should not be checked in.
 
@@ -67,8 +70,8 @@ All task targets honour the `.env` or `.env.local` overrides. If the Jarvis repo
 ### GitHub Actions
 - Workflow: `.github/workflows/ci.yml`.
 - Steps: checkout → setup uv/node/task → run pre-commit → execute lint/test/security via task wrappers → perform Compose validation (`scripts/healthcheck.sh`).
-- The job succeeds even if the Jarvis repo is not present, but emits warnings so you remember to clone or set `JARVIS_ROOT`.
-- To integrate with a private Jarvis repo, add a checkout step in the workflow or extend `scripts/bootstrap.sh` to clone from a secret URL.
+- The job succeeds even if the target project directory is not present, but emits warnings so you remember to clone it or set `TARGET_ROOT` correctly.
+- To integrate with a private repository, add a checkout step in the workflow or extend `scripts/bootstrap.sh` to clone from a secret URL.
 
 ---
 
@@ -82,13 +85,14 @@ All task targets honour the `.env` or `.env.local` overrides. If the Jarvis repo
 ---
 
 ## 7. Health Checks & Troubleshooting
-- `task healthcheck` (or `bash scripts/healthcheck.sh`) validates `docker compose config`, inspects running services, and probes Postgres readiness when available.
+- `task healthcheck` (or `bash scripts/healthcheck.sh`) validates `docker compose config`, inspects running services, and probes Postgres readiness when available. Configure `HEALTHCHECK_DB_SERVICE`, `HEALTHCHECK_DB_USER`, and `HEALTHCHECK_DB_NAME` in your env files if your database service uses different identifiers.
 - Use `task doctor` to confirm binary versions across host and container environments.
 - If `task` or `pre-commit` are missing, rerun `scripts/bootstrap.sh`. The script installs both (using uv where possible) and keeps user-level binaries on your PATH.
 - Override behaviour with environment variables:
-  - `RUN_TASK_STRICT=1` – Fail instead of skipping when the Jarvis repo is missing.
+  - `RUN_TASK_STRICT=1` – Fail instead of skipping when the target project directory is missing.
   - `HEALTHCHECK_STRICT=1` – Force healthcheck failures when prerequisites are absent.
   - `COMPOSE_UP_FLAGS` – Adjust Compose behaviour (e.g., `--build --detach --remove-orphans`).
+  - `HEALTHCHECK_DB_SERVICE`, `HEALTHCHECK_DB_USER`, `HEALTHCHECK_DB_NAME` – Override the database service/name/user used by `task healthcheck`.
 
 ---
 
@@ -98,7 +102,7 @@ All task targets honour the `.env` or `.env.local` overrides. If the Jarvis repo
 - `.env.template`, `.env.local.template` – Root environment configuration templates.
 - `Taskfile.yml` – Task runner definition for all workflows.
 - `scripts/` – Bootstrap, healthcheck, task wrappers, shared utilities.
-- `templates/jarvis/` – Service-specific `.env` templates for cloning into the Jarvis repo.
+- `templates/` – Example configuration templates copied into the target project (Jarvis samples provided by default).
 
 ---
 

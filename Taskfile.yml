@@ -5,22 +5,22 @@ dotenv:
   - .env.local
 
 vars:
-  JARVIS_ROOT: '{{default "./jarvis" (or .JARVIS_ROOT (env "JARVIS_ROOT"))}}'
+  TARGET_ROOT: '{{default "./devplatform" (or .TARGET_ROOT (env "TARGET_ROOT"))}}'
   COMPOSE_FILE: '{{default "compose.yaml" (or .COMPOSE_FILE (env "COMPOSE_FILE"))}}'
-  COMPOSE_PROJECT_NAME: '{{default "jarvis" (or .COMPOSE_PROJECT_NAME (env "COMPOSE_PROJECT_NAME"))}}'
+  COMPOSE_PROJECT_NAME: '{{default "devplatform" (or .COMPOSE_PROJECT_NAME (env "COMPOSE_PROJECT_NAME"))}}'
   COMPOSE_UP_FLAGS: '{{default "--build --detach" (or .COMPOSE_UP_FLAGS (env "COMPOSE_UP_FLAGS"))}}'
   PYTHON_SERVICE_DIR: '{{default "backend" (or .PYTHON_SERVICE_DIR (env "PYTHON_SERVICE_DIR"))}}'
   FRONTEND_DIR: '{{default "frontend" (or .FRONTEND_DIR (env "FRONTEND_DIR"))}}'
   MIGRATOR_DIR: '{{default "backend/migrator" (or .MIGRATOR_DIR (env "MIGRATOR_DIR"))}}'
 
 tasks:
-  ensure-jarvis:
+  ensure-target:
     internal: true
     cmds:
       - |
-        if [ ! -d "{{.JARVIS_ROOT}}" ]; then
-          echo "Jarvis repository not found at '{{.JARVIS_ROOT}}'."
-          echo "Set JARVIS_ROOT in .env or environment to point at the application code."
+        if [ ! -d "{{.TARGET_ROOT}}" ]; then
+          echo "Target project directory not found at '{{.TARGET_ROOT}}'."
+          echo "Set TARGET_ROOT in .env or environment to point at the application code."
           exit 1
         fi
 
@@ -38,8 +38,8 @@ tasks:
 
   sync-backend:
     desc: Install Python dependencies with uv across services
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
     cmds:
       - |
         find . -maxdepth 3 -name pyproject.toml | sort | while IFS= read -r file; do
@@ -51,8 +51,8 @@ tasks:
 
   sync-frontend:
     desc: Install frontend dependencies
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}/{{.FRONTEND_DIR}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}/{{.FRONTEND_DIR}}'
     cmds:
       - |
         if [ -f "package.json" ]; then
@@ -76,15 +76,15 @@ tasks:
 
   lint-backend:
     desc: Run backend linting (ruff) across services
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
     cmds:
       - uvx ruff check .
 
   lint-frontend:
     desc: Run frontend linting (npm lint if available)
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}/{{.FRONTEND_DIR}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}/{{.FRONTEND_DIR}}'
     cmds:
       - |
         if [ -f "package.json" ]; then
@@ -105,15 +105,15 @@ tasks:
 
   format-backend:
     desc: Format backend code using ruff format
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
     cmds:
       - uvx ruff format .
 
   format-frontend:
     desc: Run frontend formatter (prettier via npm if available)
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}/{{.FRONTEND_DIR}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}/{{.FRONTEND_DIR}}'
     cmds:
       - |
         if [ -f "package.json" ]; then
@@ -134,8 +134,8 @@ tasks:
 
   test-backend:
     desc: Execute backend unit tests across services
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
     cmds:
       - |
         find . -maxdepth 3 -name pyproject.toml | sort | while IFS= read -r file; do
@@ -151,8 +151,8 @@ tasks:
 
   test-frontend:
     desc: Execute frontend tests via npm test if available
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}/{{.FRONTEND_DIR}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}/{{.FRONTEND_DIR}}'
     cmds:
       - |
         if [ -f "package.json" ]; then
@@ -177,8 +177,8 @@ tasks:
 
   security-backend:
     desc: Run backend security scan with bandit
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
     cmds:
       - |
         find . -maxdepth 3 -name pyproject.toml | sort | while IFS= read -r file; do
@@ -195,8 +195,8 @@ tasks:
 
   security-frontend:
     desc: Run frontend dependency audit
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}/{{.FRONTEND_DIR}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}/{{.FRONTEND_DIR}}'
     cmds:
       - |
         if [ -f "package.json" ]; then
@@ -217,35 +217,35 @@ tasks:
 
   migrate:
     desc: Apply database migrations using alembic
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}/{{.MIGRATOR_DIR}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}/{{.MIGRATOR_DIR}}'
     cmds:
       - uv run alembic upgrade head
 
   compose-up:
     desc: Launch docker compose stack in detached mode
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}'
     cmds:
       - docker compose --project-name {{.COMPOSE_PROJECT_NAME}} -f {{.COMPOSE_FILE}} up {{.COMPOSE_UP_FLAGS}}
 
   compose-down:
     desc: Tear down docker compose stack
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}'
     cmds:
       - docker compose --project-name {{.COMPOSE_PROJECT_NAME}} -f {{.COMPOSE_FILE}} down --remove-orphans
 
   compose-logs:
     desc: Tail docker compose logs
-    deps: [ensure-jarvis]
-    dir: '{{.JARVIS_ROOT}}'
+    deps: [ensure-target]
+    dir: '{{.TARGET_ROOT}}'
     cmds:
       - docker compose --project-name {{.COMPOSE_PROJECT_NAME}} -f {{.COMPOSE_FILE}} logs -f
 
   healthcheck:
     desc: Run stack smoke checks
-    deps: [ensure-jarvis]
+    deps: [ensure-target]
     cmds:
       - bash scripts/healthcheck.sh
 

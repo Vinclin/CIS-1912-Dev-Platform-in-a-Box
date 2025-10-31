@@ -48,13 +48,13 @@ copy_template() {
 copy_template ".env.template" ".env"
 copy_template ".env.local.template" ".env.local"
 
-seed_jarvis_templates() {
-  local jarvis_root
-  jarvis_root="$(resolve_jarvis_root)"
-  local template_root="${PROJECT_ROOT}/templates/jarvis"
+seed_target_templates() {
+  local target_root
+  target_root="$(resolve_target_root)"
+  local template_root="${PROJECT_ROOT}/templates"
 
-  if [ ! -d "${jarvis_root}" ]; then
-    log WARN "Jarvis repository not found at ${jarvis_root}; skipping template sync."
+  if [ ! -d "${target_root}" ]; then
+    log WARN "Target project directory not found at ${target_root}; skipping template sync."
     return
   fi
 
@@ -62,10 +62,10 @@ seed_jarvis_templates() {
     return
   fi
 
-  log INFO "Syncing environment templates into Jarvis repo at ${jarvis_root}"
+  log INFO "Syncing environment templates into target project at ${target_root}"
   while IFS= read -r template; do
     local relative="${template#${template_root}/}"
-    local target="${jarvis_root}/${relative%.template}"
+    local target="${target_root}/${relative%.template}"
     mkdir -p "$(dirname "${target}")"
     if [ -f "${target}" ]; then
       log INFO "Keeping existing ${target}"
@@ -76,7 +76,7 @@ seed_jarvis_templates() {
   done < <(find "${template_root}" -type f -name '*.template' | sort)
 }
 
-seed_jarvis_templates
+seed_target_templates
 
 ensure_task() {
   if command -v task >/dev/null 2>&1; then
