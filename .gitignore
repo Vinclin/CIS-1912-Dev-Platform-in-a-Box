@@ -1,0 +1,22 @@
+# Ignore environment files generated during bootstrap
+.env
+.env.local
+
+# Python/Node artefacts
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+node_modules/
+
+# Virtual environments
+.venv/
+*/.venv/
+
+# Task/uv caches
+.task/
+.uv/
+
+# Misc
+.DS_Store
+*.log

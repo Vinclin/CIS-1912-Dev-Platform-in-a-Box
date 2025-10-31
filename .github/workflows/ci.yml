@@ -1,0 +1,57 @@
+name: Developer Platform CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+      - "feature/**"
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install Task CLI
+        uses: arduino/setup-task@v1
+        with:
+          version: v3.39.2
+
+      - name: Install dependencies for pre-commit
+        run: uv tool install pre-commit
+
+      - name: Run pre-commit checks
+        run: pre-commit run --all-files --show-diff-on-failure
+
+      - name: Lint via task runner
+        run: bash scripts/run-task.sh lint
+
+      - name: Test via task runner
+        run: bash scripts/run-task.sh test
+
+      - name: Security via task runner
+        run: bash scripts/run-task.sh security
+
+      - name: Docker Compose healthcheck
+        run: bash scripts/healthcheck.sh

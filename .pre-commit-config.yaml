@@ -1,0 +1,41 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.6
+    hooks:
+      - id: ruff
+        name: ruff (lint)
+        args: ["--fix", "--force-exclude"]
+      - id: ruff-format
+        name: ruff (format)
+
+  - repo: local
+    hooks:
+      - id: task-format
+        name: task format
+        entry: bash scripts/format.sh
+        language: system
+        pass_filenames: false
+      - id: task-lint
+        name: task lint
+        entry: bash scripts/lint.sh
+        language: system
+        pass_filenames: false
+      - id: task-test
+        name: task test
+        entry: bash scripts/test.sh
+        language: system
+        pass_filenames: false
+      - id: task-security
+        name: task security
+        entry: bash scripts/security.sh
+        language: system
+        pass_filenames: false

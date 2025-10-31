@@ -1,0 +1,30 @@
+{
+  "name": "Jarvis Developer Platform",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspace",
+  "runArgs": [
+    "--init"
+  ],
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  "remoteEnv": {
+    "JARVIS_ROOT": "/workspace/jarvis"
+  },
+  "postCreateCommand": "bash scripts/bootstrap.sh --devcontainer",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.black-formatter",
+        "charliermarsh.ruff",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode.makefile-tools",
+        "github.vscode-github-actions"
+      ]
+    }
+  }
+}

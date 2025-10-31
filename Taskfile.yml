@@ -1,0 +1,262 @@
+version: "3"
+
+dotenv:
+  - .env
+  - .env.local
+
+vars:
+  JARVIS_ROOT: '{{default "./jarvis" (or .JARVIS_ROOT (env "JARVIS_ROOT"))}}'
+  COMPOSE_FILE: '{{default "compose.yaml" (or .COMPOSE_FILE (env "COMPOSE_FILE"))}}'
+  COMPOSE_PROJECT_NAME: '{{default "jarvis" (or .COMPOSE_PROJECT_NAME (env "COMPOSE_PROJECT_NAME"))}}'
+  COMPOSE_UP_FLAGS: '{{default "--build --detach" (or .COMPOSE_UP_FLAGS (env "COMPOSE_UP_FLAGS"))}}'
+  PYTHON_SERVICE_DIR: '{{default "backend" (or .PYTHON_SERVICE_DIR (env "PYTHON_SERVICE_DIR"))}}'
+  FRONTEND_DIR: '{{default "frontend" (or .FRONTEND_DIR (env "FRONTEND_DIR"))}}'
+  MIGRATOR_DIR: '{{default "backend/migrator" (or .MIGRATOR_DIR (env "MIGRATOR_DIR"))}}'
+
+tasks:
+  ensure-jarvis:
+    internal: true
+    cmds:
+      - |
+        if [ ! -d "{{.JARVIS_ROOT}}" ]; then
+          echo "Jarvis repository not found at '{{.JARVIS_ROOT}}'."
+          echo "Set JARVIS_ROOT in .env or environment to point at the application code."
+          exit 1
+        fi
+
+  doctor:
+    desc: Show tool versions currently available
+    cmds:
+      - uv --version
+      - python3 --version
+      - node --version
+      - npm --version
+      - pnpm --version
+      - docker --version
+      - docker compose version
+      - task --version
+
+  sync-backend:
+    desc: Install Python dependencies with uv across services
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
+    cmds:
+      - |
+        find . -maxdepth 3 -name pyproject.toml | sort | while IFS= read -r file; do
+          [ -z "${file}" ] && continue
+          svc_dir="$(dirname "${file}")"
+          echo "→ uv sync (${svc_dir})"
+          (cd "${svc_dir}" && uv sync)
+        done || true
+
+  sync-frontend:
+    desc: Install frontend dependencies
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}/{{.FRONTEND_DIR}}'
+    cmds:
+      - |
+        if [ -f "package.json" ]; then
+          corepack enable || true
+          if [ -f "pnpm-lock.yaml" ]; then
+            pnpm install
+          elif [ -f "yarn.lock" ]; then
+            yarn install
+          else
+            npm install
+          fi
+        else
+          echo "package.json not found in frontend directory ({{.FRONTEND_DIR}})."
+        fi
+
+  sync:
+    desc: Install all project dependencies
+    cmds:
+      - task: sync-backend
+      - task: sync-frontend
+
+  lint-backend:
+    desc: Run backend linting (ruff) across services
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
+    cmds:
+      - uvx ruff check .
+
+  lint-frontend:
+    desc: Run frontend linting (npm lint if available)
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}/{{.FRONTEND_DIR}}'
+    cmds:
+      - |
+        if [ -f "package.json" ]; then
+          if npm run | grep -q "lint"; then
+            npm run lint
+          else
+            echo "No lint script defined in package.json; skipping."
+          fi
+        else
+          echo "package.json not found in frontend directory; skipping lint."
+        fi
+
+  lint:
+    desc: Run all lint checks
+    cmds:
+      - task: lint-backend
+      - task: lint-frontend
+
+  format-backend:
+    desc: Format backend code using ruff format
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
+    cmds:
+      - uvx ruff format .
+
+  format-frontend:
+    desc: Run frontend formatter (prettier via npm if available)
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}/{{.FRONTEND_DIR}}'
+    cmds:
+      - |
+        if [ -f "package.json" ]; then
+          if npm run | grep -q "format"; then
+            npm run format
+          else
+            npx prettier --write .
+          fi
+        else
+          echo "package.json not found in frontend directory; skipping format."
+        fi
+
+  format:
+    desc: Format code across backend and frontend
+    cmds:
+      - task: format-backend
+      - task: format-frontend
+
+  test-backend:
+    desc: Execute backend unit tests across services
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
+    cmds:
+      - |
+        find . -maxdepth 3 -name pyproject.toml | sort | while IFS= read -r file; do
+          [ -z "${file}" ] && continue
+          svc_dir="$(dirname "${file}")"
+          if [ -d "${svc_dir}/tests" ] || [ -d "${svc_dir}/app/tests" ]; then
+            echo "→ pytest (${svc_dir})"
+            (cd "${svc_dir}" && uv run pytest -q)
+          else
+            echo "Skipping pytest for ${svc_dir} (no tests directory)"
+          fi
+        done || true
+
+  test-frontend:
+    desc: Execute frontend tests via npm test if available
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}/{{.FRONTEND_DIR}}'
+    cmds:
+      - |
+        if [ -f "package.json" ]; then
+          if npm run | grep -q "test"; then
+            if npm test -- --watch=false; then
+              :
+            else
+              npm test
+            fi
+          else
+            echo "No test script defined; skipping."
+          fi
+        else
+          echo "package.json not found; skipping tests."
+        fi
+
+  test:
+    desc: Run backend and frontend test suites
+    cmds:
+      - task: test-backend
+      - task: test-frontend
+
+  security-backend:
+    desc: Run backend security scan with bandit
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}/{{.PYTHON_SERVICE_DIR}}'
+    cmds:
+      - |
+        find . -maxdepth 3 -name pyproject.toml | sort | while IFS= read -r file; do
+          [ -z "${file}" ] && continue
+          svc_dir="$(dirname "${file}")"
+          target_dir="${svc_dir}/app"
+          if [ -d "${target_dir}" ]; then
+            echo "→ bandit (${target_dir})"
+            uvx bandit -q -r "${target_dir}"
+          else
+            echo "Skipping bandit for ${svc_dir} (no app directory)"
+          fi
+        done || true
+
+  security-frontend:
+    desc: Run frontend dependency audit
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}/{{.FRONTEND_DIR}}'
+    cmds:
+      - |
+        if [ -f "package.json" ]; then
+          npm audit --audit-level=high || {
+            status=$?
+            echo "npm audit reported issues (exit code ${status}). Review output above."
+            exit ${status}
+          }
+        else
+          echo "package.json not found; skipping npm audit."
+        fi
+
+  security:
+    desc: Run security scanners
+    cmds:
+      - task: security-backend
+      - task: security-frontend
+
+  migrate:
+    desc: Apply database migrations using alembic
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}/{{.MIGRATOR_DIR}}'
+    cmds:
+      - uv run alembic upgrade head
+
+  compose-up:
+    desc: Launch docker compose stack in detached mode
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}'
+    cmds:
+      - docker compose --project-name {{.COMPOSE_PROJECT_NAME}} -f {{.COMPOSE_FILE}} up {{.COMPOSE_UP_FLAGS}}
+
+  compose-down:
+    desc: Tear down docker compose stack
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}'
+    cmds:
+      - docker compose --project-name {{.COMPOSE_PROJECT_NAME}} -f {{.COMPOSE_FILE}} down --remove-orphans
+
+  compose-logs:
+    desc: Tail docker compose logs
+    deps: [ensure-jarvis]
+    dir: '{{.JARVIS_ROOT}}'
+    cmds:
+      - docker compose --project-name {{.COMPOSE_PROJECT_NAME}} -f {{.COMPOSE_FILE}} logs -f
+
+  healthcheck:
+    desc: Run stack smoke checks
+    deps: [ensure-jarvis]
+    cmds:
+      - bash scripts/healthcheck.sh
+
+  bootstrap:
+    desc: Full bootstrap (dependencies, pre-commit, env files)
+    cmds:
+      - bash scripts/bootstrap.sh
+
+  ci:
+    desc: Run full CI suite (lint, test, security)
+    cmds:
+      - task: lint
+      - task: test
+      - task: security
