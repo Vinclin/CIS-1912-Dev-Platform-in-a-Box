@@ -35,7 +35,7 @@ jobs:
       - name: Install Task CLI
         uses: arduino/setup-task@v1
         with:
-          version: v3.39.2
+          version: 3.39.2
 
       - name: Install dependencies for pre-commit
         run: uv tool install pre-commit
