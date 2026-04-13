@@ -20,7 +20,7 @@ jobs:
         id: dependabot-metadata
         uses: dependabot/fetch-metadata@v3
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.AUTO_MERGE_TOKEN }}
 
       # Determine whether this update qualifies for auto-merge.
       # Patch and minor version bumps (including security fixes) are safe to
@@ -41,7 +41,7 @@ jobs:
         run: gh pr review "$PR_URL" --approve --body "Automatically approved by dependabot-auto-merge workflow."
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTO_MERGE_TOKEN }}
 
       # Enable auto-merge so the PR merges as soon as required checks pass.
       - name: Enable auto-merge
@@ -49,4 +49,4 @@ jobs:
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTO_MERGE_TOKEN }}
